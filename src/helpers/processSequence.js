@@ -14,38 +14,83 @@
  * Иногда промисы от API будут приходить в состояние rejected, (прямо как и API в реальной жизни)
  * Ответ будет приходить в поле {result}
  */
- import Api from '../tools/api';
+import Api from '../tools/api';
+import {pipe, equals, allPass, prop, not} from "ramda";
 
- const api = new Api();
+const api = new Api();
 
- /**
-  * Я – пример, удали меня
-  */
- const wait = time => new Promise(resolve => {
-     setTimeout(resolve, time);
- })
+/**
+* Я – пример, удали меня
+*/
+const wait = time => new Promise(resolve => {
+    setTimeout(resolve, time);
+})
 
- const processSequence = ({value, writeLog, handleSuccess, handleError}) => {
-     /**
-      * Я – пример, удали меня
-      */
-     writeLog(value);
+const getValue = (obj) => {
+    return prop('value', obj);
+}
+const getWriteLog = (obj) => {
+    return prop('writeLog', obj);
+}
 
-     api.get('https://api.tech/numbers/base', {from: 2, to: 10, number: '01011010101'}).then(({result}) => {
-         writeLog(result);
-     });
+const getHandleError = (obj) => {
+    return prop('handleError', obj);
+}
 
-     wait(2500).then(() => {
-         writeLog('SecondLog')
+const lessTenSymbols = (string) => {
+    return equals(string.length < 10, true);
+}
+const moreTwoSymbols = (string) => {
+    return equals(string.length > 2, true);
+}
 
-         return wait(1500);
-     }).then(() => {
-         writeLog('ThirdLog');
+const positiveNum = (string) => {
+    return equals(string[0] !== '-', true);
+}
 
-         return wait(400);
-     }).then(() => {
-         handleSuccess('Done');
-     });
- }
+const fromInt = (string) => {
+    return /^[0-9]+(\.[0-9]+)?$/.test(string);
+}
+
+const toNumber = (value) => {
+    return +value;
+}
+
+const roundNumber = (value) => {
+    return Math.round(value);
+}
+const toBin = async (value) => {
+    const result = api.get('https://api.tech/numbers/base', {from: 10, to: 2, number: value});
+    return await result;
+}
+
+const processSequence = ({value, writeLog, handleSuccess, handleError}) => {
+    const mWriteLog = (value) => {
+        writeLog(value);
+        return value;
+    }
+    const validate = (value) => {
+        if (not(allPass([lessTenSymbols, moreTwoSymbols, positiveNum, fromInt])(value))) {
+            handleError('ValidationError');
+        }
+        return value;
+    }
+
+    pipe(getValue, mWriteLog, validate, toNumber, roundNumber, mWriteLog, toBin, mWriteLog)({value, writeLog, handleSuccess, handleError});
+
+
+
+    wait(2500).then(() => {
+        writeLog('SecondLog')
+
+        return wait(1500);
+    }).then(() => {
+        writeLog('ThirdLog');
+
+        return wait(400);
+        }).then(() => {
+            handleSuccess('Done');
+        });
+    }
 
 export default processSequence;
